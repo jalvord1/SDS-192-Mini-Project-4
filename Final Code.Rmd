@@ -1,0 +1,264 @@
+---
+title: 'More Sequels Than Ever? Only in Studios Making Big $'
+output: 
+  html_document:
+    theme: journal
+    code_folding: hide
+    fig_width: 10
+    fig_height: 6
+---
+<br>
+<div style="text-align:center" markdown="1">
+![](https://mentalgaming.files.wordpress.com/2013/06/attack-of-the-sequels.jpg?w=470){ width=60% }
+</div>
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(ggplot2)
+library(extrafont)
+
+#Importing new font
+font_import(pattern = '[L/l]inotype')
+font_import(pattern = '[A/a]rial')
+
+install.packages("mdsr", repos="http://cran.rstudio.com/")
+install.packages("RMySQL", repos="http://cran.rstudio.com/")
+
+library(dplyr)
+library(mdsr)
+library(RMySQL)
+db <- dbConnect_scidb(dbname = "imdb")
+
+#Tables within IMDB database!
+dbListTables(db)
+
+#Listing variables in a table!
+dbListFields(db, "info_type")
+
+#Visualizing tables as an example
+#movie_link table tells what is a sequel
+sql <- "
+SELECT *
+FROM movie_link
+LIMIT 0, 100;
+"
+movie_link_tb <- db %>%
+  dbGetQuery(sql)
+```
+
+```{r}
+#All of the movies that are made in US each year
+
+#Grouping by production year to get count of ALL movies for each of those years
+#Only in US, only movies.
+#index put on kind of media to only search for movies
+#other indexes made
+sql <- "
+SELECT count(DISTINCT(t.id)) as count_movie, production_year
+FROM title t
+JOIN movie_info mi ON mi.movie_id = t.id
+JOIN kind_type k ON k.id = t.kind_id
+WHERE production_year <= 2017
+AND k.kind = 'movie'
+AND mi.info_type_id = 8
+AND info LIKE '%USA%'
+GROUP BY production_year;
+"
+
+total_US_movies <- db %>%
+  dbGetQuery(sql)
+```
+
+
+
+```{r}
+#All of the sequels that are made in US each year
+
+#Grouping by production year to get count of unique sequels (as we are defining) for each of those years
+#Only in US, only movies.
+#index put on kind of media to only search for movies
+#other indexes made
+sql2 <- "
+SELECT count(DISTINCT(t.id)) as count_sequals, t.production_year
+FROM movie_link m
+JOIN title t ON t.id = m.movie_id
+JOIN title t2 on t2.id = m.linked_movie_id
+JOIN link_type l ON l.id = m.link_type_id
+JOIN kind_type k ON k.id = t.kind_id
+JOIN movie_info mi ON mi.movie_id = t.id
+WHERE k.kind = 'movie'
+AND t.production_year <= 2017
+AND l.id IN (1, 2, 3, 4, 13, 14)
+AND mi.info_type_id = 8
+AND info LIKE '%USA%'
+GROUP BY t.production_year;
+"
+
+sequel_US_movies <- db %>%
+  dbGetQuery(sql2)
+```
+
+
+
+```{r, include = FALSE}
+#All of the revenue made by any US movie each year WRONG
+# sql3 <- "
+# SELECT t.id, t.title, production_year, SUM(replace(substring_index(substring_index(mi.info, '$', -1), ' ', 1), ',', '')) as revenue
+# FROM movie_info mi
+# JOIN title t ON t.id = mi.movie_id
+# WHERE production_year <= 2017
+# AND kind_id = 1
+# AND mi.info_type_id = 107
+# AND mi.info LIKE '%USA%'
+# AND mi.info NOT Like '%Non-USA%'
+# AND mi.info NOT LIKE '%Worldwide%'
+# GROUP BY production_year;
+# "
+# 
+# total_US_revenue <- db %>%
+#   dbGetQuery(sql3)
+```
+
+```{r}
+#All of the revenue made by any US sequel each year
+
+##Grouping by production year to get a sum of revenue for sequels (as we are defining) in that year
+#Only in US, only movies, only 6 categories we are defining as sequel (repeating the movie in some way)
+#index put on kind of media to only search for movies
+#Other indexes made
+sql4 <- "
+SELECT DISTINCT t.id, t.title, t.production_year, SUM(replace(substring_index(substring_index(mi.info, '$', -1), ' ', 1), ',', '')) as revenue_Sum
+FROM movie_link m
+JOIN title t ON t.id = m.movie_id
+JOIN title t2 on t2.id = m.linked_movie_id
+JOIN link_type l ON l.id = m.link_type_id
+JOIN kind_type k ON k.id = t.kind_id
+JOIN movie_info mi ON mi.movie_id = t.id
+WHERE k.kind = 'movie'
+AND t.production_year <= 2017
+AND l.id IN (1, 2, 3, 4, 13, 14)
+AND mi.info_type_id = 107
+AND mi.info LIKE '%USA%'
+AND mi.info NOT Like '%Non-USA%'
+AND mi.info NOT LIKE '%Worldwide%'
+GROUP BY t.production_year;
+"
+
+sequel_US_revenue <- db %>%
+  dbGetQuery(sql4)
+```
+
+```{r}
+#ALL MOVIES REVENUE
+
+#Grouping by production year to get a sum of revenue for ALL movies in that year
+#Only in US, only movies
+#index put on kind of media to only search for movies
+#other indexes made
+sql4 <- "
+SELECT DISTINCT t.id, t.title, t.production_year, SUM(replace(substring_index(substring_index(mi.info, '$', -1), ' ', 1), ',', '')) as revenue_Sum_all
+FROM movie_link m
+JOIN title t ON t.id = m.movie_id
+JOIN title t2 on t2.id = m.linked_movie_id
+JOIN link_type l ON l.id = m.link_type_id
+JOIN kind_type k ON k.id = t.kind_id
+JOIN movie_info mi ON mi.movie_id = t.id
+WHERE k.kind = 'movie'
+AND t.production_year <= 2017
+AND mi.info_type_id = 107
+AND mi.info LIKE '%USA%'
+AND mi.info NOT Like '%Non-USA%'
+AND mi.info NOT LIKE '%Worldwide%'
+GROUP BY t.production_year;
+"
+
+ALL_MOVIES_US_revenue <- db %>%
+  dbGetQuery(sql4)
+```
+
+```{r, include = FALSE}
+#TOTAL all movies WRONG
+# sql2 <- "
+# SELECT count(DISTINCT t.id) as count_sequals, t.production_year
+# FROM movie_link m
+# JOIN title t ON t.id = m.movie_id
+# JOIN title t2 on t2.id = m.linked_movie_id
+# JOIN link_type l ON l.id = m.link_type_id
+# JOIN kind_type k ON k.id = t.kind_id
+# JOIN movie_info mi ON mi.movie_id = t.id
+# WHERE k.kind = 'movie'
+# AND t.production_year <= 2017
+# AND mi.info_type_id = 8
+# AND info LIKE '%USA%'
+# GROUP BY t.production_year;
+# "
+# 
+# TOTAL_US_movies <- db %>%
+#   dbGetQuery(sql2)
+```
+
+Published on `r format(Sys.Date(), "%B %e, %Y")` at `r format(Sys.time(), "%H:%M:%S")`
+
+Julianna Alvord and Peyton Draper
+
+Many recent analyses of the US film industry have commented on what seems to be a rapid increase in the number of sequels produced. With huge box office hits from the Star Wars and Marvel Franchises, this observation seems entirely reasonable. But in fact, the numbers tell a more interesting story surrounding the business of filmmaking, who occupies media space, and who is bringing in huge revenue.
+
+The analysis of movies is more difficult than expected. Thousands and thousands of data are stored in the public IMDB database. After spending many hours scouring said database to determine what specifically would be defined as a sequel, a decision finally had to be made. We decided first that we were interested in more than strictly sequels. We wanted to explore the phenomenon that movies are less unique than they were in the past. In order to do so, we chose to look at movies defined as "Follows", "Followed By", "Remake of", "Remade as", "Version of", and "Similar to" by IMDB. We discovered that between the years of 1955 and 2016, the percentage of sequels produced has actually been steadily decreasing and fell below 5% of movies in 2016. Surprisingly, during this same time, the percentage of total revenue for sequels was increasing. How can the percentage of sequels be decreasing while the revenue percentage be increasing? In short, an increase of indie movies that are not financially successful enough to create sequels are competing against major studio films that are finding that success. 
+
+```{r, message=FALSE, warning=FALSE}
+#Creating the table and making graph!
+
+#Joining all tables created in SQL by production year, then summarizing to get percentages rev and n for sequels
+Graph_table <- ALL_MOVIES_US_revenue %>%
+  full_join(sequel_US_revenue, by = "production_year") %>%
+  full_join(sequel_US_movies, by = "production_year") %>%
+  full_join(total_US_movies, by = "production_year") %>%
+  filter(production_year >= 1955) %>%
+  filter(production_year <2017) %>%
+  mutate(percent_rev = (revenue_Sum / revenue_Sum_all)*100, percent_seq = (count_sequals / count_movie)*100) %>%
+  group_by(production_year) %>%
+  summarise(percent_rev = (revenue_Sum / revenue_Sum_all)*100,
+            percent_seq = (count_sequals / count_movie)*100)
+
+
+#Creating the graph with two different lines connecting all points then a smooth line overlaid on top
+#Changed font on this graph
+ggplot(Graph_table, aes(production_year, percent_rev)) + 
+  geom_line(aes(y = percent_rev, colour = "percent_rev"), size = 0.3) +
+  geom_smooth(aes(y = percent_rev, colour = "percent_rev"), se = FALSE, size = 1.3) +
+  geom_line(aes(y = percent_seq, colour = "percent_seq"), size = 0.3) +
+  geom_smooth(aes(y = percent_seq, colour = "percent_seq"), se = FALSE, size = 1.3) +
+  theme(legend.title = element_blank(), panel.border = element_blank(), panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(), axis.line = element_line(colour = "black", size = 0.2), axis.text.x = element_text(colour="grey20",size=10, family = "Arial Bold"), axis.text.y = element_text(color = "grey20", size =10, family = "Arial Bold"), axis.title.x = element_text(vjust=-.55, family = "Arial Bold" ), axis.title.y = element_text(vjust = .55, family = "Arial Bold"), plot.title = element_text(family = "Arial Bold"), panel.background = element_rect(fill = 'white'), legend.text = element_text(family = "Arial Bold", size = 10)) +
+  #Changed font on this graph
+  labs(x="Year", y="Percentage") +
+  scale_y_discrete(limits = c(0, 5, 10, 15, 19),
+                   labels = c("0%", "5%", "10%", "15%", "19%")) +
+  scale_x_discrete(limits = c(1960, 1980, 2000, 2017),
+                   labels = c("1960", "1980", "2000", "2017")) +
+  scale_color_manual(values = c("midnightblue", "tan1"),
+                    breaks=c("percent_rev", "percent_seq"),
+                    labels=c("Sequel Revenue Percentage", "N of Sequels Percentage"))
+```
+
+Famed director Steven Spielberg recently helped the clear up the confusion of this discovery, stating that hollywood is “squeezing the middle class out of Hollywood and only allowing the $70m-plus films or the $10m-minus films [to be made].” [^1] After further research, we understood the reference he made to the rise of the independent film as the only alternative to major studio films. As the [average cost of studio films rises](http://articles.latimes.com/1995-03-08/business/fi-40252_1_average-cost), individuals are having harder times pulling off the mid-budget movie (a kind of movie the studios want nothing to do with- they’d rather pay more money and take that risk in order to market to a larger audience). The middle is then thinned out, with more movies becoming lower-budgeted, independent films.
+
+[^1]: Shone, Tom. “The unstoppable rise of independent films.” Financial Times, 20 Feb. 2015, [www.ft.com/content/bc58eede-b770-11e4-8807-00144feab7de/](www.ft.com/content/bc58eede-b770-11e4-8807-00144feab7de/).
+
+This research sheds light on the kind of oligopoly (an industry that is dominated by a few producers) that major film studios have over the movie market, and how that affects revenues. Former Paramount Studios producer and even executive Robert Evans [notes himself](http://www.nytimes.com/2009/04/26/business/media/26scene.html) that the studios in power “are a mini-monopoly.” [^2] For example, in 2015, Disney and Universal pocketed almost 90% of the ticket sales through the year's top 10 films [^3] and just this morning, Disney bought most of 21st Century Fox in a deal that "promises to reshape the media industry." [^4] This further suggests that mid-budget movies are getting weeded out and more and more indie films will instead be made. As this happened, these major films and their large budgets are then able to receive most of the box office revenue through their larger advertising budgets and marketing to worldwide audiences. Indie films, on the other hand, make significantly less. This could be the reason why, despite indie films being able to receive critical acclaim (like dominating awards such as the [Best Oscar Picture](http://m.imdb.com/chart/bestpicture/) in recent times), they are not in the running for best box office hits- they just don’t reach the same scale of audience.
+
+[^2]: Cieply, Michael. “Down in Front? Not in Hollywood.” The New York Times, The New York Times, 25 Apr. 2009, [www.nytimes.com/2009/04/26/business/media/26scene.html](www.nytimes.com/2009/04/26/business/media/26scene.html).
+
+[^3]: Harwell, Drew. "In media universe, the force is strongest with Disney, Universal" The Washington Post, 2 Nov. 2015, [https://www.washingtonpost.com/business/economy/the-empires-arise-disney-and-universal-dominate-us-box-office/2015/11/02/4fb4a982-7ce4-11e5-beba-927fd8634498_story.html?utm_term=.634508cb0400](https://www.washingtonpost.com/business/economy/the-empires-arise-disney-and-universal-dominate-us-box-office/2015/11/02/4fb4a982-7ce4-11e5-beba-927fd8634498_story.html?utm_term=.634508cb0400).
+
+[^4]: Gold, Hadas and Riley, Charles. "Disney is buying most of 21st Century Fox for $52.4 billion" CNN media, 14 Dec. 2017, [http://money.cnn.com/2017/12/14/media/disney-fox-deal/](http://money.cnn.com/2017/12/14/media/disney-fox-deal/)
+
+Not only do these industries have the opportunity to create sequels, they see further profit in doing so. With the rise of algorithm and data use by these film giants comes the same result: "If it aint broke, don't fix it." The major industries will almost always choose the safer option when it comes to creating a movie which usually means less variation between films equating to more sequels, remakes, and reboots and less homeruns and big risks. [^5]
+
+[^5]: Schwartz, Elaine. "The Movie Business's New Competitive Market Structure." Econlife, 12 May 2016, [https://econlife.com/2015/04/a-new-competitive-market-structure-for-the-movie-industry/](https://econlife.com/2015/04/a-new-competitive-market-structure-for-the-movie-industry/).
+
+Evidence suggests that streaming networks such as Amazon and Netflix may disrupt this pattern and change the game for independent films. Sean Fennessey for The Ringer explains that certain independent filmmakers are finding lucrative success through deals with these networks. No longer do these directors have to go through the painstaking process of submitting materials to film festivals. Instead, they can simply sell their works to a streaming network and experience instant profit. Despite the meloncholy some filmakers feel about the change in venue for their work, many believe the benefits outweight the disadvantages. This year, Sundance showed 119 films and fourty-one have already been bought. Perhaps a few years down the line our graphic and analysis will change and fingers will point immediately to these streaming services. 
+
+At this time, however, understanding the control of major studios over the film industry then allows our figure to actually make sense. The percentage of movies that are sequels declines as more and more indie films are made. The revenue percentage increases though, because those indie films cannot financially make sequels when they aren't reaching the same audience and making the same revenues as major films. The major films have seen how profitable is is for themselves to make multiple sequels despite their costs, hence the surge of superhero worlds and book-adapted series mentioned earlier. Just like that, a graphic that initially seemed questionable is explained- the actual number of sequels declines as multitudes of indie producers do not have the means of creating them, while the big film companies capitalize on this subset of the market and make bank doing so, creating franchises that appeal to the masses.
